@@ -18,6 +18,10 @@ const port = process.env.PORT || 4000;
 connectDB();
 // const allowedOrigins = ["http://localhost:5173","https://mosque-donation-app-six.vercel.app"];
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://mosque-donation-boys6.vercel.app",
+];
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -33,11 +37,6 @@ app.use(
 
 app.use(express.json());
 app.use(cookieparser());
-
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://mosque-donation-app-six.vercel.app",
-];
 
 //API test routes
 app.get("/", (req, res) => {
