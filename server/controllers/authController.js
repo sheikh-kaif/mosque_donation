@@ -73,8 +73,18 @@ exports.register = async (req, res) => {
       text: `Welcome to FaithFund family. Your account has been created with email id: ${email}`,
     };
     console.log("Attempting to send email to:", email);
-    await transporter.sendMail(mailOption);
-    console.log("email send:", email);
+    try {
+      await transporter.sendMail(mailOption);
+      console.log("Verification email sent");
+    } catch (err) {
+      console.error("Email sending failed:", err);
+    }
+
+    // Continue returning success
+    return res.json({
+      status: true,
+      message: "Registration successful",
+    });
     res.status(201).json({
       status: "success",
       message: "User registered successfully",
