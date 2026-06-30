@@ -5,7 +5,100 @@ const transporter = require("../config/nodemailer");
 const validator = require("validator");
 const { sendServerError } = require("../utils/errorResponse");
 
-//creating new user
+// //creating new user
+// exports.register = async (req, res) => {
+//   console.log("Register route hit");
+//   console.log(
+//     "Mongoose readyState:",
+//     require("mongoose").connection.readyState,
+//   );
+
+//   const { name, email, password } = req.body;
+//   console.log("Password received:", password, password.length);
+//   console.log("Email received:", email);
+//   if (!name || !email || !password) {
+//     return res.status(400).json({
+//       message: "Missing Details",
+//     });
+//   }
+//   try {
+//     console.log("before findone");
+//     const existingUser = await User.findOne({ email });
+//     console.log("after findone");
+//     if (existingUser) {
+//       return res.status(400).json({
+//         status: "unsuccessfull",
+//         message: "User already exists",
+//       });
+//     }
+
+//     if (
+//       !validator.isStrongPassword(password, {
+//         minLength: 6,
+//         minLowercase: 1,
+//         minUppercase: 0,
+//         minNumbers: 1,
+//         minSymbols: 0,
+//       })
+//     ) {
+//       return res.status(400).json({
+//         message: "Password must be at least 6 characters and include a number",
+//       });
+//     }
+
+//     const hashedPassword = await bcrypt.hash(password, 10);
+//     const user = await User.create({ name, email, password: hashedPassword });
+
+//     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+//       expiresIn: "7d",
+//     });
+
+//     // res.cookie("token", token, {
+//     //   httpOnly: true,
+//     //   secure: process.env.NODE_ENV === "production",
+//     //   sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+//     //   maxAge: 7 * 24 * 60 * 60 * 1000,
+//     // });
+
+//     res.cookie("token", token, {
+//       httpOnly: true,
+//       secure: true,
+//       sameSite: "none",
+//       maxAge: 7 * 24 * 60 * 60 * 1000,
+//     });
+//     const mailOption = {
+//       from: process.env.SENDER_EMAIL,
+//       to: email,
+//       subject: "Welcome",
+//       text: `Welcome to FaithFund family. Your account has been created with email id: ${email}`,
+//     };
+//     console.log("Attempting to send email to:", email);
+//     try {
+//       await transporter.sendMail(mailOption);
+//       console.log("Verification email sent");
+//     } catch (err) {
+//       console.error("Email sending failed:", err);
+//     }
+
+//     // Continue returning success
+//     return res.json({
+//       status: true,
+//       message: "Registration successful",
+//     });
+//     res.status(201).json({
+//       status: "success",
+//       message: "User registered successfully",
+//     });
+//   } catch (error) {
+//     return sendServerError(
+//       res,
+//       error,
+//       "register",
+//       "Could not create your account. Please try again.",
+//     );
+//   }
+// };
+
 exports.register = async (req, res) => {
   console.log("Register route hit");
   console.log(
@@ -14,17 +107,19 @@ exports.register = async (req, res) => {
   );
 
   const { name, email, password } = req.body;
-  console.log("Password received:", password, password.length);
   console.log("Email received:", email);
+
   if (!name || !email || !password) {
     return res.status(400).json({
       message: "Missing Details",
     });
   }
+
   try {
     console.log("before findone");
     const existingUser = await User.findOne({ email });
     console.log("after findone");
+
     if (existingUser) {
       return res.status(400).json({
         status: "unsuccessfull",
@@ -47,18 +142,24 @@ exports.register = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email, password: hashedPassword });
+
+    let user;
+    try {
+      user = await User.create({ name, email, password: hashedPassword });
+    } catch (err) {
+      // Handles race condition: two requests creating the same email at once
+      if (err.code === 11000) {
+        return res.status(400).json({
+          status: "unsuccessfull",
+          message: "User already exists",
+        });
+      }
+      throw err;
+    }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
-
-    // res.cookie("token", token, {
-    //   httpOnly: true,
-    //   secure: process.env.NODE_ENV === "production",
-    //   sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-    //   maxAge: 7 * 24 * 60 * 60 * 1000,
-    // });
 
     res.cookie("token", token, {
       httpOnly: true,
@@ -66,29 +167,27 @@ exports.register = async (req, res) => {
       sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+
+    // Respond immediately — do NOT make the user wait on email sending
+    res.json({
+      status: true,
+      message: "Registration successful",
+    });
+
+    // Fire-and-forget email AFTER responding, so a slow/broken SMTP
+    // connection can never hang or fail the signup request
     const mailOption = {
       from: process.env.SENDER_EMAIL,
       to: email,
       subject: "Welcome",
       text: `Welcome to FaithFund family. Your account has been created with email id: ${email}`,
     };
-    console.log("Attempting to send email to:", email);
-    try {
-      await transporter.sendMail(mailOption);
-      console.log("Verification email sent");
-    } catch (err) {
-      console.error("Email sending failed:", err);
-    }
 
-    // Continue returning success
-    return res.json({
-      status: true,
-      message: "Registration successful",
-    });
-    res.status(201).json({
-      status: "success",
-      message: "User registered successfully",
-    });
+    console.log("Attempting to send email to:", email);
+    transporter
+      .sendMail(mailOption)
+      .then(() => console.log("Verification email sent"))
+      .catch((err) => console.error("Email sending failed:", err));
   } catch (error) {
     return sendServerError(
       res,
