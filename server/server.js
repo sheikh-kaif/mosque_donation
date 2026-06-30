@@ -21,7 +21,7 @@ connectDB();
 const allowedOrigins = [
   "http://localhost:5173",
   "https://mosque-donation-boys6.vercel.app",
-  "https://mosque-donation-tawny.vercel.app/",
+  "https://mosque-donation-tawny.vercel.app",
 ];
 app.use(
   cors({
